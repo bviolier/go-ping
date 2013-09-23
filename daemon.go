@@ -1,21 +1,32 @@
 package main
 
-import "fmt"
-import "time"
-import "net/http"
-import "net"
-import "io/ioutil"
-import "errors"
+import (
+	"fmt"
+	"time"
+	"net/http"
+	"net"
+	"io/ioutil"
+	"errors"
+	"encoding/json"
+	"os"
+	"os/exec"
+)
 
-// Define Stringer as an interface type with one method, String.
-type Pingu struct {
-    url string
-    interval uint8
-    lastCheck time.Time
+
+type ServersConfig struct {
+    Servers[] Server
+}
+
+type Server struct {
+	Domain string
+	Timeout int
+	Interval int
+	LastCheck time.Time
+	LastState string
 }
 
 type CheckResult struct {
-	target Pingu
+	target *Server
     result string
 }
 
@@ -27,20 +38,20 @@ func pingtime(c chan time.Time) {
 	}
 }
 
-func dialTimeout(network, addr string) (net.Conn, error) {
-    return net.DialTimeout(network, addr, 2 * time.Second)
-}
 
-func doRequest(url string) (error) {
+func doRequest(server Server) (error) {
+	mydialout := func(network, addr string)(net.Conn, error) { 
+			return net.DialTimeout(network, addr, time.Duration(server.Timeout) * time.Second)
+		}
  	transport := http.Transport{
-        Dial: dialTimeout,
+        Dial: mydialout,
     }
 
     client := http.Client{
         Transport: &transport,
     }
 
-    resp,err := client.Get(url)
+    resp,err := client.Get(server.Domain)
     if err != nil {
     	return err
     }
@@ -60,17 +71,17 @@ func doRequest(url string) (error) {
 	return nil
 }
 
-func CheckTarget (c chan CheckResult, now time.Time, target *Pingu) {
+func CheckTarget (c chan CheckResult, now time.Time, target *Server) {
 	
-	if (target.lastCheck.Unix() + int64(target.interval) < now.Unix()) {
-		target.lastCheck = now
+	if (target.LastCheck.Unix() + int64(target.Interval) <= now.Unix()) {
+		target.LastCheck = now
 		
-		err := doRequest(target.url)
+		err := doRequest(*target)
 
 		if err != nil {
-			c <- CheckResult{target: *target, result: "NOT OK:" + err.Error()}
+			c <- CheckResult{target: target, result: "NOT OK: " + err.Error()}
 		} else {
-			c <- CheckResult{target: *target, result: "OK"}
+			c <- CheckResult{target: target, result: "OK"}
 		}
 	} 
 }
@@ -78,11 +89,15 @@ func CheckTarget (c chan CheckResult, now time.Time, target *Pingu) {
 
 func main() {
 	fmt.Println("Go Ping Pong made in China")
-
-	var targets []Pingu
-
-	targets = append(targets, Pingu{url:"http://127.0.0.1", interval:5})
-	targets = append(targets, Pingu{url:"http://127.0.0.1/jemoeder", interval:7})
+	
+    configFile, _ := ioutil.ReadFile("servers.json")
+	ServerList := new(ServersConfig)
+   	json.Unmarshal(configFile, &ServerList)
+	
+	fmt.Println("Going to check the following servers:")
+	
+	showServers(ServerList);
+	
 	c := make(chan time.Time)
 	results := make(chan CheckResult)
 
@@ -90,31 +105,31 @@ func main() {
 
 	for { 
 		select {
-			case q := <- c:
-				fmt.Println("Checking all the things! ", q)
-				
-				for i,_ := range targets {
-					go CheckTarget(results, q, &targets[i])
+			case q := <- c:				
+				for i,_ := range ServerList.Servers {
+					go CheckTarget(results, q, &ServerList.Servers[i])
 				}
 
 
 			case result := <- results:
-				fmt.Println(result.target.url + ":" + result.result)
+				result.target.LastState = result.result
+				showServers(ServerList)
 		}
 	}
+}
 
+func showServers(ServerList *ServersConfig) {
+	c := exec.Command("clear")
+	c.Stdout = os.Stdout
+	c.Run()
+	fmt.Printf("%3s  %30s  %7s  %8s  %13s %13s\n", "#", "Domain", "Timeout", "Interval", "Last check", "Last state")
+	for index, value := range ServerList.Servers {
+		showServer(index, value)
+	}
+	
+}
 
-	// channel with timer	
-
-	// ->
-
-	// 	foreach json 
-
-	// 		go ping
-
-	// 			: timer? 10000000000000
-
-	// 		result <- 
-
-	// 		output
+func showServer(index int, value Server) {
+	const layout = "15:04:05"
+	fmt.Printf("%3d  %30s  %7d  %8d  %13s    %s\n", index+1, value.Domain, value.Timeout, value.Interval, value.LastCheck.Format(layout), value.LastState)	
 }

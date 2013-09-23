@@ -1,17 +1,17 @@
 {
 		"servers": [
 	        {
-	            "domain": "google.nl",
+	            "domain": "http://google.nl",
 	            "timeout": 5,
 	            "interval": 60
 	        },
 	        {
-	            "domain": "nu.nl",
+	            "domain": "http://nu.nl",
 	            "timeout": 5,
-	            "interval": 60
+	            "interval": 5
 	        },
 	        {
-	            "domain": "messagebird.com",
+	            "domain": "http://messagebird.com",
 	            "timeout": 4,
 	            "interval": 30
 	        }
