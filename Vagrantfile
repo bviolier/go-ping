@@ -28,7 +28,7 @@ Vagrant::Config.run do |config|
   config.vm.forward_port 80, 8080
 
   config.vm.share_folder( "vagrant-root", "/vagrant", ".", :extra => 'dmode=777,fmode=777' )
-  config.vm.share_folder( "project-root", "/home/vagrant/project" , "~/Sites/googleGo" )
+  config.vm.share_folder( "project-root", "/home/vagrant/project" , "~/Sites/google-go" )
   config.vm.provision "shell", inline: $provisioning_script
 
 end
